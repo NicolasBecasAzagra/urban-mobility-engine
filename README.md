@@ -9,6 +9,8 @@ A native Rust engine from a BSc thesis in Computer Engineering. It indexes GPS p
 Native **Rust** engine for near-real-time urban traffic analysis.  
 It combines historical data with the [Madrid City Council traffic API](https://informo.madrid.es) to detect anomalies and congested zones in real time.
 
+📄 The full thesis write-up (in Spanish) is available [here](https://drive.google.com/file/d/1mGmO571RynBTtX9S1QJqbsnNb1kY3vA_/view?usp=sharing).
+
 ---
 
 ## Quick start
