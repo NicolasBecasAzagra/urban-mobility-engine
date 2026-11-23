@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Madrid Urban Mobility Control — Real Time</title>
+    <!-- MapLibre GL JS for 3D rendering via WebGL -->
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f8fafc;
+            color: #1e293b;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ── Header ─────────────────────────────────────────── */
+        .header {
+            background: #ffffff;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 14px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: relative;
+            z-index: 1000;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+        }
+
+        .header-title-container {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .header h1 {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #0f172a;
+            letter-spacing: -0.02em;
+        }
+
+        .header-subtitle {
+            font-size: 0.75rem;
+            color: #64748b;
+            font-weight: 400;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        /* Clean, professional LIVE indicator */
+        .live-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            background: #fee2e2;
+            border: 1px solid #fca5a5;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #991b1b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .live-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #b91c1c;
+        }
+
+        /* Refresh counter */
+        .refresh-info {
+            font-size: 0.72rem;
+            color: #64748b;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #f1f5f9;
+            padding: 4px 10px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .refresh-ring {
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(79, 70, 229, 0.2);
+            border-top-color: #4f46e5;
+            border-radius: 50%;
+            animation: spin 3s linear infinite;
+        }
+
+        .refresh-ring.paused {
+            animation-play-state: paused;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* ── Layout ──────────────────────────────────────────── */
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            flex: 1;
+            height: calc(100vh - 58px);
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            background: #f1f5f9;
+        }
+
+        .sidebar {
+            background: #ffffff;
+            border-left: 1px solid #e2e8f0;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Custom Scrollbar */
+        .sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .sidebar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* ── Sections ───────────────────────────────────────── */
+        .section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .section h3 {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #475569;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 6px;
+        }
+
+        /* ── Status box ─────────────────────────────────────── */
+        .status-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.78rem;
+        }
+
+        .status-label {
+            color: #64748b;
+        }
+
+        .status-value {
+            font-weight: 500;
+            color: #0f172a;
+        }
+
+        .status-value.live {
+            color: #b91c1c;
+            font-weight: 600;
+        }
+
+        /* ── KPIs ────────────────────────────────────────────── */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .kpi-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .kpi-card:hover {
+            border-color: #cbd5e1;
+            box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.02);
+        }
+
+        .kpi-value {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #0f172a;
+            letter-spacing: -0.01em;
+        }
+
+        .kpi-label {
+            font-size: 0.65rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 500;
+        }
+
+        /* ── Level bars ─────────────────────────────────── */
+        .level-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 6px;
+            padding: 8px 10px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+        }
+
+        .level-badge {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.75rem;
+            flex-shrink: 0;
+        }
+
+        .level-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .level-name-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+        }
+
+        .level-name {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .level-desc {
+            font-size: 0.62rem;
+            color: #64748b;
+        }
+
+        .level-progress {
+            height: 5px;
+            background: #e2e8f0;
+            border-radius: 3px;
+            margin-top: 3px;
+            overflow: hidden;
+        }
+
+        .level-progress-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .level-count {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #0f172a;
+            min-width: 20px;
+            text-align: right;
+        }
+
+        /* Professional, muted colors */
+        .color-a { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+        .fill-a  { background: #10b981; }
+        
+        .color-b { background: #ecfccb; color: #3f6212; border: 1px solid #d9f99d; }
+        .fill-b  { background: #84cc16; }
+        
+        .color-c { background: #fef9c3; color: #854d0e; border: 1px solid #fef08a; }
+        .fill-c  { background: #eab308; }
+        
+        .color-d { background: #ffedd5; color: #9a3412; border: 1px solid #fed7aa; }
+        .fill-d  { background: #f97316; }
+        
+        .color-e { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+        .fill-e  { background: #ef4444; }
+        
+        .color-f { background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; }
+        .fill-f  { background: #a855f7; }
+
+        /* ── Cell list ─────────────────────────────────── */
+        .cell-list-container {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 250px;
+            overflow-y: auto;
+            padding-right: 2px;
+        }
+
+        .cell-list-container::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .cell-list-container::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 2px;
+        }
+
+        .cell-item {
+            padding: 10px 12px;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            border-left: 4px solid #94a3b8;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            font-size: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .cell-item:hover {
+            border-color: #cbd5e1;
+            background: #f8fafc;
+            transform: translateX(2px);
+        }
+
+        .cell-meta-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .cell-road {
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        .cell-srf {
+            font-weight: 700;
+        }
+
+        .cell-stats {
+            display: flex;
+            gap: 8px;
+            font-size: 0.65rem;
+            color: #64748b;
+            border-top: 1px dashed #f1f5f9;
+            padding-top: 4px;
+            margin-top: 2px;
+        }
+
+        /* ── Update toast ──────────────────────────── */
+        #toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(80px);
+            background: #1e293b;
+            color: #ffffff;
+            padding: 8px 18px;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            z-index: 9999;
+            pointer-events: none;
+            border: 1px solid #334155;
+        }
+
+        #toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* ── Custom MapLibre GL popups ──────────────── */
+        .maplibregl-popup-content {
+            background: #ffffff !important;
+            color: #1e293b !important;
+            border-radius: 8px !important;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+            border: 1px solid #e2e8f0 !important;
+            padding: 14px 16px !important;
+            font-family: 'Inter', sans-serif !important;
+            font-size: 0.78rem !important;
+            line-height: 1.4 !important;
+        }
+
+        .maplibregl-popup-close-button {
+            color: #94a3b8 !important;
+            padding: 4px 8px !important;
+            font-size: 1rem !important;
+            outline: none !important;
+        }
+
+        .maplibregl-popup-close-button:hover {
+            background: transparent !important;
+            color: #475569 !important;
+        }
+
+        .popup-title {
+            font-weight: 700;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+            color: #0f172a;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 4px;
+        }
+
+        .popup-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 4px 14px;
+        }
+
+        .popup-label {
+            color: #64748b;
+            font-size: 0.7rem;
+            font-weight: 500;
+        }
+
+        .popup-value {
+            font-weight: 600;
+            font-size: 0.78rem;
+            color: #1e293b;
+            text-align: right;
+        }
+
+        .popup-separator {
+            grid-column: 1/-1;
+            height: 1px;
+            background: #f1f5f9;
+            margin: 6px 0;
+        }
+
+        /* ── Error state ─────────────────────────────────────── */
+        .error-box {
+            background: #fef2f2;
+            border: 1px solid #fee2e2;
+            border-radius: 8px;
+            padding: 14px;
+            font-size: 0.75rem;
+            color: #991b1b;
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        .error-box code {
+            background: #fee2e2;
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-weight: 600;
+        }
+    </style>
+</head>
+
+<body>
+    <header class="header">
+        <div class="header-title-container">
+            <h1>3D Urban Mobility Control</h1>
+            <span class="header-subtitle">Flat traffic view with an interactive map and 3D buildings</span>
+        </div>
+        <div class="header-right">
+            <div class="live-badge">
+                <div class="live-dot"></div>
+                Real Time
+            </div>
+            <div class="refresh-info">
+                <div class="refresh-ring" id="refreshRing"></div>
+                <span id="refreshLabel">Updating...</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div id="map"></div>
+        <aside class="sidebar">
+
+            <!-- Polling status -->
+            <div class="section">
+                <h3>Source Status</h3>
+                <div class="status-box" id="tickBox">
+                    <div class="status-row">
+                        <span class="status-label">Data source</span>
+                        <span class="status-value live" id="tickSource">—</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">Last update</span>
+                        <span class="status-value" id="tickTime">—</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">Next poll</span>
+                        <span class="status-value" id="nextUpdate">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KPIs -->
+            <div class="section">
+                <h3>Engine Metrics</h3>
+                <div class="kpi-grid" id="kpis"></div>
+            </div>
+
+            <!-- Congestion distribution -->
+            <div class="section">
+                <h3>Congestion Distribution</h3>
+                <div id="levelBars"></div>
+            </div>
+
+
+        </aside>
+    </div>
+
+    <!-- Update toast -->
+    <div id="toast">Map updated with new data</div>
+
+    <script>
+        const COLORS = {
+            A: '#10b981', B: '#84cc16', C: '#eab308',
+            D: '#f97316', E: '#ef4444', F: '#a855f7'
+        };
+        const LEVEL_INFO = {
+            A: { label: 'Free flow',             desc: 'SRF ≥ 0.90' },
+            B: { label: 'Stable flow',           desc: 'SRF 0.80–0.90' },
+            C: { label: 'Moderate restrictions', desc: 'SRF 0.65–0.80' },
+            D: { label: 'Unstable flow',         desc: 'SRF 0.50–0.65' },
+            E: { label: 'Severe congestion',     desc: 'SRF 0.35–0.50' },
+            F: { label: 'Collapse',              desc: 'SRF < 0.35' }
+        };
+
+        // ── MapLibre GL 3D map ──────────────────────────────────────────
+        // Start in a flat top-down view (pitch: 0, bearing: 0)
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: 'https://tiles.openfreemap.org/styles/positron', // Free vector style, no API key
+            center: [-3.70379, 40.41678], // Madrid
+            zoom: 13,
+            pitch: 0, // Top-down view by default for clarity
+            bearing: 0
+        });
+
+        // Navigation controls in the top-right corner
+        map.addControl(new maplibregl.NavigationControl({ showCompass: true }));
+
+        let mapLoaded = false;
+        let cachedData = null;
+        let lastDataHash = null;
+        let secondsToNext = 10;
+        let isFirstLoad = true;
+
+        // Wait for the map style to load before adding the 3D buildings layer and the cells
+        map.on('load', () => {
+            mapLoaded = true;
+
+            // 1. Detect the map vector tile source ID dynamically
+            const style = map.getStyle();
+            let vectorSourceId = 'openfreemap';
+            if (style && style.sources) {
+                const found = Object.entries(style.sources).find(([_, src]) => src.type === 'vector');
+                if (found) {
+                    vectorSourceId = found[0];
+                }
+            }
+
+            // 2. Extrude the Madrid BUILDINGS in 3D
+            // They only show in 3D if the user tilts the map manually (right click or compass)
+            map.addLayer({
+                'id': '3d-buildings',
+                'source': vectorSourceId,
+                'source-layer': 'building',
+                'type': 'fill-extrusion',
+                'minzoom': 13.5,
+                'paint': {
+                    'fill-extrusion-color': '#e2e8f0', 
+                    'fill-extrusion-height': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        13.5, 0,
+                        14, ['coalesce', ['get', 'render_height'], ['get', 'height'], 12]
+                    ],
+                    'fill-extrusion-base': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        13.5, 0,
+                        14, ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0]
+                    ],
+                    'fill-extrusion-opacity': 0.55
+                }
+            });
+
+            // 3. Register the GeoJSON source for our S2 traffic cells
+            map.addSource('cells', {
+                type: 'geojson',
+                data: { type: 'FeatureCollection', features: [] }
+            });
+
+            // 4. Flat FILL layer for the cells
+            map.addLayer({
+                'id': 'cells-fill',
+                'source': 'cells',
+                'type': 'fill',
+                'paint': {
+                    'fill-color': ['get', 'color'],
+                    'fill-opacity': ['get', 'fill_opacity']
+                }
+            });
+
+            // 5. Solid OUTLINE layer for active cells
+            map.addLayer({
+                'id': 'cells-outline-active',
+                'source': 'cells',
+                'type': 'line',
+                'filter': ['==', ['get', 'has_metrics'], true],
+                'paint': {
+                    'line-color': ['get', 'color'],
+                    'line-width': 1.8,
+                    'line-opacity': 0.8
+                }
+            });
+
+            // 6. Dashed OUTLINE layer for coverage (empty) cells
+            map.addLayer({
+                'id': 'cells-outline-coverage',
+                'source': 'cells',
+                'type': 'line',
+                'filter': ['==', ['get', 'has_metrics'], false],
+                'paint': {
+                    'line-color': ['get', 'color'],
+                    'line-width': 1,
+                    'line-opacity': 0.4,
+                    'line-dasharray': [3, 3]
+                }
+            });
+
+            // If data was ready before the map loaded, paint it now
+            if (cachedData) {
+                updateMapLayers(cachedData);
+            }
+
+            // Click event for popups on the cell fill
+            map.on('click', 'cells-fill', (e) => {
+                const feature = e.features[0];
+                const properties = feature.properties;
+                const c = JSON.parse(properties.raw_data);
+                const color = properties.color;
+                const hasMet = !!c.metrics;
+                
+                let html = `<div class="popup-title">S2 cell ${c.cell_id.substring(0,8)}...</div>
+                            <div class="popup-grid">
+                            <div class="popup-label">GPS points</div><div class="popup-value">${c.point_count}</div>
+                            <div class="popup-label">Centroid</div><div class="popup-value">${c.lat.toFixed(4)}, ${c.lng.toFixed(4)}</div>`;
+                            
+                if (hasMet) {
+                    const m = c.metrics;
+                    html += `<div class="popup-separator"></div>
+                             <div class="popup-label">Mean SRF</div>
+                             <div class="popup-value" style="color:${color};font-weight:700">${m.avg_delay_factor.toFixed(3)}</div>
+                             <div class="popup-label">Congestion</div>
+                             <div class="popup-value" style="color:${color};font-weight:700">${m.congestion_level}</div>
+                             <div class="popup-label">Status</div>
+                             <div class="popup-value">${LEVEL_INFO[m.congestion_level]?.label}</div>
+                             <div class="popup-label">Road type</div><div class="popup-value">${m.road_type}</div>`;
+                }
+                if (c.stats) {
+                    const s = c.stats;
+                    html += `<div class="popup-separator"></div>
+                             <div class="popup-label">Median</div><div class="popup-value">${s.median.toFixed(3)}</div>
+                             <div class="popup-label">P25 / P75</div>
+                             <div class="popup-value">${s.percentile_25.toFixed(3)} / ${s.percentile_75.toFixed(3)}</div>`;
+                    if (s.anomaly_count > 0)
+                        html += `<div class="popup-label" style="color:#b91c1c">Anomalies</div>
+                                 <div class="popup-value" style="color:#b91c1c">${s.anomaly_count}</div>`;
+                }
+                html += '</div>';
+
+                new maplibregl.Popup()
+                    .setLngLat(e.lngLat)
+                    .setHTML(html)
+                    .addTo(map);
+            });
+
+            // Change cursor on hover over cells
+            map.on('mouseenter', 'cells-fill', () => {
+                map.getCanvas().style.cursor = 'pointer';
+            });
+            map.on('mouseleave', 'cells-fill', () => {
+                map.getCanvas().style.cursor = '';
+            });
+        });
+
+        // ── Smooth fly-to animation when clicking a cell ───────────
+        // Keeps the top-down view (pitch: 0) by default for clarity
+        function flyToCell(lat, lng) {
+            map.flyTo({
+                center: [lng, lat],
+                zoom: 15.5,
+                pitch: 0,
+                bearing: 0,
+                essential: true,
+                duration: 2000
+            });
+        }
+
+        // ── Data loading ────────────────────────────────────────────────
+        async function loadData() {
+            document.getElementById('refreshRing').classList.remove('paused');
+            try {
+                const res = await fetch('live_output.json?t=' + Date.now());
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+
+                // Detect whether the data changed
+                const hash = JSON.stringify(data.pipeline);
+                const changed = hash !== lastDataHash;
+                lastDataHash = hash;
+
+                render(data, changed);
+
+            } catch (e) {
+                console.warn('Error loading live_output.json:', e.message);
+                document.getElementById('refreshLabel').textContent = 'No data';
+                document.getElementById('tickBox').innerHTML = `
+                    <div class="error-box">
+                        Waiting for engine data...<br>
+                        <small style="color:#64748b;margin-top:6px;display:block">
+                            Run: <code>cargo run --bin tfg -- live</code>
+                        </small>
+                    </div>`;
+            } finally {
+                document.getElementById('refreshRing').classList.add('paused');
+            }
+        }
+
+        function updateMapLayers(data) {
+            const { cells } = data;
+
+            const features = cells.map(c => {
+                const coords = c.vertices.map(v => [v[1], v[0]]);
+                coords.push(coords[0]); // Close the polygon
+
+                const hasMet = !!c.metrics;
+                const color = hasMet ? (COLORS[c.metrics.congestion_level] || '#4f46e5') : '#94a3b8';
+                
+                // Soft fill (cells with metrics 0.4 opacity; empty coverage cells 0.08)
+                const fill_opacity = hasMet ? 0.4 : 0.08;
+
+                return {
+                    type: 'Feature',
+                    geometry: {
+                        type: 'Polygon',
+                        coordinates: [coords]
+                    },
+                    properties: {
+                        cell_id: c.cell_id,
+                        color: color,
+                        fill_opacity: fill_opacity,
+                        has_metrics: hasMet,
+                        raw_data: JSON.stringify(c)
+                    }
+                };
+            });
+
+            map.getSource('cells').setData({
+                type: 'FeatureCollection',
+                features: features
+            });
+
+            // Fit the view only on first load (top-down, pitch 0)
+            if (isFirstLoad && cells.length > 0) {
+                const lats = cells.map(c => c.lat);
+                const lngs = cells.map(c => c.lng);
+                map.fitBounds([
+                    [Math.min(...lngs) - 0.005, Math.min(...lats) - 0.005],
+                    [Math.max(...lngs) + 0.005, Math.max(...lats) + 0.005]
+                ], {
+                    padding: 40,
+                    pitch: 0,
+                    bearing: 0,
+                    duration: 1800
+                });
+                isFirstLoad = false;
+            }
+        }
+
+        function render(data, changed) {
+            const { pipeline, cells } = data;
+
+            // ── Tick status ───────────────────────────────────────────
+            const now = new Date().toLocaleTimeString('en-GB');
+            document.getElementById('tickSource').textContent = pipeline.source || 'Madrid Real-Time API';
+            document.getElementById('tickTime').textContent = pipeline.timestamp || now;
+            document.getElementById('nextUpdate').textContent = `In ~${secondsToNext}s`;
+            document.getElementById('refreshLabel').textContent =
+                changed ? `Updated · ${now}` : `No changes · ${now}`;
+
+            // ── KPIs ──────────────────────────────────────────────────────
+            document.getElementById('kpis').innerHTML = `
+                <div class="kpi-card">
+                    <div class="kpi-value" style="color:#4f46e5">${pipeline.total_gps_points.toLocaleString()}</div>
+                    <div class="kpi-label">GPS points</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-value" style="color:#0f172a">${pipeline.s2_cell_count.toLocaleString()}</div>
+                    <div class="kpi-label">S2 cells</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-value" style="color:#10b981">${pipeline.cells_with_metrics}</div>
+                    <div class="kpi-label">With metrics</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-value" style="color:#ef4444">
+                        ${cells.filter(c => c.metrics && c.metrics.congestion_level >= 'D').length}
+                    </div>
+                    <div class="kpi-label">Congested</div>
+                </div>`;
+
+            // ── Level distribution ───────────────────────────────────
+            const levels = { A: 0, B: 0, C: 0, D: 0, E: 0, F: 0 };
+            cells.forEach(c => {
+                if (c.metrics && levels[c.metrics.congestion_level] !== undefined)
+                    levels[c.metrics.congestion_level]++;
+            });
+            const maxCount = Math.max(...Object.values(levels), 1);
+            document.getElementById('levelBars').innerHTML = Object.entries(levels)
+                .map(([lev, count]) => `
+                    <div class="level-bar">
+                        <div class="level-badge color-${lev.toLowerCase()}">${lev}</div>
+                        <div class="level-info">
+                            <div class="level-name-row">
+                                <span class="level-name">${LEVEL_INFO[lev].label}</span>
+                                <span class="level-desc">${LEVEL_INFO[lev].desc}</span>
+                            </div>
+                            <div class="level-progress">
+                                <div class="level-progress-fill fill-${lev.toLowerCase()}"
+                                     style="width:${(count/maxCount*100).toFixed(0)}%"></div>
+                            </div>
+                        </div>
+                        <div class="level-count">${count}</div>
+                    </div>`).join('');
+
+
+            // Update the 3D map layers
+            if (mapLoaded) {
+                updateMapLayers(data);
+            } else {
+                cachedData = data;
+            }
+
+            // Update toast (only if the data changed)
+            if (changed) showToast();
+        }
+
+        function showToast() {
+            const t = document.getElementById('toast');
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2500);
+        }
+
+        // ── Auto-refresh every 10 seconds ───────────────────────────────
+        const REFRESH_INTERVAL = 10;
+        secondsToNext = REFRESH_INTERVAL;
+
+        setInterval(() => {
+            secondsToNext--;
+            if (secondsToNext <= 0) {
+                secondsToNext = REFRESH_INTERVAL;
+                loadData();
+            }
+            const el = document.getElementById('nextUpdate');
+            if (el) el.textContent = `In ~${secondsToNext}s`;
+        }, 1000);
+
+        // Initial load
+        loadData();
+    </script>
+</body>
+
+</html>

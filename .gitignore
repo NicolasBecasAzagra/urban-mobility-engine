@@ -1,0 +1,64 @@
+# Artefactos de compilación de Rust
+/target
+/bin
+
+# Archivos de configuración local (usar config.example.toml como template)
+config.toml
+
+# Archivos de dependencias o herramientas
+Cargo.lock
+
+# IDEs y editores
+*.swp
+*.swo
+.idea/
+.vscode/
+*.iml
+
+# Sistemas operativos
+.DS_Store
+Thumbs.db
+
+# Datos de tráfico (archivos grandes - NO versionar)
+data/raw/
+data/processed/
+data/samples/
+# EXCEPCIÓN: tests/fixtures/ SÍ se versiona (samples pequeños para CI)
+
+# Scripts de exploración Python (trabajo temporal, no parte del proyecto)
+scripts/exploracion/
+*.ipynb_checkpoints/
+__pycache__/
+*.pyc
+.sprint-manager/
+
+# Flamegraph / profiling (archivos binarios grandes)
+*.trace/
+cargo-flamegraph.trace/
+flamegraph.svg
+perf.data
+perf.data.old
+
+# macOS extended attribute sidecar files
+._*
+
+# Thesis defence material and private working files (kept locally, not published)
+esencial/
+Guion_Presentacion_TFG.md
+Preguntas_Defensa_TFG.md
+Preguntas_Defensa_TFG.txt
+LEEME.txt
+scratch/
+
+# Thesis charts, diagrams and demo extras (kept locally, not published)
+comparativa_costes_anuales.png
+generate_chart.py
+generate_chart_v2.py
+diagrama_arquitectura_eraser.txt
+diagrama_arquitectura_mermaid.md
+diagrama_pipeline_tick_eraser.txt
+visualizacion_h3_vs_s2.svg
+demo/madrid.geojson
+demo/metrics.csv
+demo/dashboard_anomalias.html
+demo/make_anomalies_dashboard.py

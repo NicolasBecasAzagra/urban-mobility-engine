@@ -1,0 +1,63 @@
+# ========================================
+# URBAN MOBILITY ENGINE CONFIGURATION
+# ========================================
+# This file is a TEMPLATE.
+# To use it:
+#   1. Copy it: cp config.example.toml config.toml
+#   2. Adjust the values for your environment
+#   3. Do NOT commit config.toml (it is in .gitignore)
+
+# ========================================
+# GEOSPATIAL PARAMETERS (S2)
+# ========================================
+[geospatial]
+# Base S2 resolution used initially for all cells
+# Level 15 ≈ 318m edge, well suited to main streets
+base_level = 15
+
+# Higher resolution used to subdivide critical areas
+# Level 17 ≈ 79m edge, for bottlenecks
+subdivision_level = 17
+
+# delay_factor threshold that triggers subdivision
+# A value of 1.5 = 50% slower than the optimal base time
+delay_threshold = 1.5
+
+# Minimum GPS points in a cell for it to be considered valid
+# Avoids subdividing cells with insufficient data
+min_gps_count = 50
+
+# ========================================
+# DATA PATHS
+# ========================================
+[data]
+# Input directory with raw GPS files (CSV)
+input_path = "./data/gps_raw/"
+
+# Output directory for processed S2 cells
+output_path = "./data/processed/"
+
+# ========================================
+# LOGGING CONFIGURATION
+# ========================================
+[logging]
+# Logging level: "trace", "debug", "info", "warn", "error"
+# For development: "debug" or "trace"
+# For production: "info"
+level = "info"
+
+# ========================================
+# TRAFFIC METRICS PARAMETERS
+# ========================================
+[metrics]
+# Free-flow reference speed for the M-30 (km/h)
+# Free-flow speeds range between 70-100 km/h
+m30_reference_speed = 90.0
+
+# Reference speed for urban roads (km/h)
+# Used as context; the urban calculation uses 'carga' (load) as a proxy
+urban_reference_speed = 50.0
+
+# Minimum observations per cell to generate a report
+# Cells with less data produce an InsufficientData error
+min_observations = 5

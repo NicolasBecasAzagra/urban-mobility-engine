@@ -1,0 +1,4 @@
+id;"fecha";"tipo_elem";"intensidad";"ocupacion";"carga";"vmed";"error";periodo_integracion
+9999;"2025-12-01 00:00:00";"URB";"-1";"-1";"-1";"0";"E";5
+1006;"INVALID-DATE";"C30";"240";"0";"0";"70";"N";5
+1006;"2025-12-01 00:00:00";"C30";"240";"0";"0";"70";"S";3

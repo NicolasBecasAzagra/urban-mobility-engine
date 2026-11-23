@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pms>
+  <fecha_hora>08/04/2026 9:20:04</fecha_hora>
+  <pm>
+    <idelem>3950</idelem>
+    <descripcion>Av.Betanzos S-N - Av.Monforte de Lemos-Av.Ilustración</descripcion>
+    <accesoAsociado>4301001</accesoAsociado>
+    <intensidad>380</intensidad>
+    <ocupacion>2</ocupacion>
+    <carga>42</carga>
+    <nivelServicio>1</nivelServicio>
+    <intensidadSat>880</intensidadSat>
+    <error>N</error>
+    <subarea>0314</subarea>
+    <st_x>439614,078998791</st_x>
+    <st_y>4481136,52322837</st_y>
+  </pm>
+  <pm>
+    <idelem>10011</idelem>
+    <descripcion>Castellana N-S - Eduardo Dato-Gta.Emilio Castelar</descripcion>
+    <accesoAsociado>0901002</accesoAsociado>
+    <intensidad>1200</intensidad>
+    <ocupacion>15</ocupacion>
+    <carga>55</carga>
+    <nivelServicio>2</nivelServicio>
+    <intensidadSat>3500</intensidadSat>
+    <error>N</error>
+    <subarea>0907</subarea>
+    <st_x>441079,123456789</st_x>
+    <st_y>4474850,987654321</st_y>
+  </pm>
+  <pm>
+    <idelem>1006</idelem>
+    <descripcion>PM20001 - M-30 Norte</descripcion>
+    <accesoAsociado>1401001</accesoAsociado>
+    <intensidad>2400</intensidad>
+    <ocupacion>8</ocupacion>
+    <carga>65</carga>
+    <nivelServicio>0</nivelServicio>
+    <intensidadSat>5000</intensidadSat>
+    <velocidad>72</velocidad>
+    <error>N</error>
+    <subarea>1423</subarea>
+    <st_x>443081,764311719</st_x>
+    <st_y>4482550,06440271</st_y>
+  </pm>
+  <pm>
+    <idelem>9999</idelem>
+    <descripcion>Punto sin ubicación conocida</descripcion>
+    <accesoAsociado>0000001</accesoAsociado>
+    <intensidad>100</intensidad>
+    <ocupacion>1</ocupacion>
+    <carga>10</carga>
+    <nivelServicio>0</nivelServicio>
+    <intensidadSat>500</intensidadSat>
+    <error>N</error>
+    <subarea>0101</subarea>
+    <st_x>440000,000000000</st_x>
+    <st_y>4479000,000000000</st_y>
+  </pm>
+  <pm>
+    <idelem>5555</idelem>
+    <descripcion>Punto con error</descripcion>
+    <accesoAsociado>0000002</accesoAsociado>
+    <intensidad>0</intensidad>
+    <ocupacion>0</ocupacion>
+    <carga>0</carga>
+    <nivelServicio>0</nivelServicio>
+    <intensidadSat>0</intensidadSat>
+    <error>E</error>
+    <subarea>0101</subarea>
+    <st_x>440000,000000000</st_x>
+    <st_y>4479000,000000000</st_y>
+  </pm>
+</pms>

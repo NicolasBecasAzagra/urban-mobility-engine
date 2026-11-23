@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚗 Urban Mobility Engine — Madrid | S2 Grid</title>
+
+    <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+        :root {
+            --accent:     #6366f1;
+            --accent-dim: rgba(99,102,241,0.18);
+            --bg-deep:    #0a0e27;
+            --bg-card:    rgba(255,255,255,0.04);
+            --text-muted: #94a3b8;
+        }
+
+        * { margin:0; padding:0; box-sizing:border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-deep);
+            color: #e0e0e0;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ── Loading overlay ─────────────────────────────────────────────── */
+        #loader {
+            position: fixed;
+            inset: 0;
+            background: var(--bg-deep);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            transition: opacity 0.6s ease, visibility 0.6s;
+        }
+        #loader.hidden { opacity:0; visibility:hidden; pointer-events:none; }
+
+        .loader-logo {
+            font-size: 2.4rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #818cf8, #6366f1, #a78bfa);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            letter-spacing: -0.5px;
+            animation: pulse-logo 2s ease-in-out infinite;
+        }
+        @keyframes pulse-logo {
+            0%,100% { opacity:1; } 50% { opacity:0.7; }
+        }
+
+        .loader-bar-wrap {
+            width: 260px;
+            height: 4px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .loader-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #6366f1, #a78bfa, #6366f1);
+            background-size: 200% 100%;
+            border-radius: 4px;
+            animation: loader-slide 1.4s linear infinite;
+        }
+        @keyframes loader-slide {
+            0%   { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .loader-status {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+
+        /* ── Header ──────────────────────────────────────────────────────── */
+        .header {
+            background: linear-gradient(135deg, #1a1f4e 0%, #0d1137 50%, #0a0e27 100%);
+            border-bottom: 1px solid rgba(99,102,241,0.3);
+            padding: 14px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            backdrop-filter: blur(20px);
+            animation: slide-down 0.5s ease both;
+        }
+        @keyframes slide-down {
+            from { transform: translateY(-100%); opacity:0; }
+            to   { transform: translateY(0);    opacity:1; }
+        }
+
+        .header h1 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #818cf8, #6366f1, #a78bfa);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+        }
+
+        .header-badges { display:flex; gap:12px; align-items:center; }
+
+        .badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border: 1px solid;
+        }
+        .badge-rust    { background:rgba(222,165,132,0.15); border-color:rgba(222,165,132,0.4); color:#dea584; }
+        .badge-s2      { background:rgba(99,102,241,0.15);  border-color:rgba(99,102,241,0.4);  color:#818cf8; }
+        .badge-maplibre { background:rgba(34,197,94,0.12); border-color:rgba(34,197,94,0.35);  color:#4ade80; }
+
+        /* Pulsing dot in the status badge */
+        .badge-live {
+            background: rgba(34,197,94,0.12);
+            border-color: rgba(34,197,94,0.4);
+            color: #4ade80;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .pulse-dot {
+            width: 7px; height: 7px;
+            background: #4ade80;
+            border-radius: 50%;
+            animation: ping 1.5s ease-in-out infinite;
+        }
+        @keyframes ping {
+            0%,100% { transform:scale(1);   opacity:1; }
+            50%     { transform:scale(1.5); opacity:0.6; }
+        }
+
+        /* ── Layout ──────────────────────────────────────────────────────── */
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 370px;
+            height: calc(100vh - 56px);
+        }
+
+        #map { width:100%; height:100%; }
+
+        /* ── Sidebar ─────────────────────────────────────────────────────── */
+        .sidebar {
+            background: linear-gradient(180deg, #111633 0%, #0d1137 100%);
+            border-left: 1px solid rgba(99,102,241,0.2);
+            overflow-y: auto;
+            padding: 18px;
+            animation: slide-right 0.5s 0.1s ease both;
+        }
+        @keyframes slide-right {
+            from { transform:translateX(40px); opacity:0; }
+            to   { transform:translateX(0);    opacity:1; }
+        }
+
+        /* Thin scrollbar */
+        .sidebar::-webkit-scrollbar { width:4px; }
+        .sidebar::-webkit-scrollbar-track { background: transparent; }
+        .sidebar::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.3); border-radius:2px; }
+
+        .section { margin-bottom: 18px; }
+
+        .section h3 {
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--accent);
+            margin-bottom: 10px;
+        }
+
+        /* ── KPI cards ───────────────────────────────────────────────────── */
+        .kpi-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+
+        .kpi-card {
+            background: var(--bg-card);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 10px;
+            padding: 12px;
+            text-align: center;
+            transition: background 0.25s, transform 0.25s, box-shadow 0.25s;
+            animation: fade-up 0.4s ease both;
+        }
+        .kpi-card:nth-child(1) { animation-delay: 0.05s; }
+        .kpi-card:nth-child(2) { animation-delay: 0.10s; }
+        .kpi-card:nth-child(3) { animation-delay: 0.15s; }
+        .kpi-card:nth-child(4) { animation-delay: 0.20s; }
+
+        .kpi-card:hover {
+            background: rgba(255,255,255,0.07);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(99,102,241,0.15);
+        }
+
+        .kpi-value {
+            font-size: 1.5rem;
+            font-weight: 800;
+            margin-bottom: 2px;
+            transition: color 0.3s;
+        }
+        .kpi-label {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* ── Level bars ──────────────────────────────────────────────────── */
+        .level-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            padding: 7px 10px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            transition: background 0.2s;
+        }
+        .level-bar:hover { background: rgba(255,255,255,0.06); }
+
+        .level-badge {
+            width:28px; height:28px;
+            border-radius:6px;
+            display:flex; align-items:center; justify-content:center;
+            font-weight:700; font-size:0.8rem; flex-shrink:0;
+        }
+        .level-info { flex:1; }
+        .level-name { font-size:0.78rem; font-weight:500; }
+        .level-desc { font-size:0.63rem; color:#64748b; }
+
+        .level-progress {
+            height: 5px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 3px;
+            margin-top: 3px;
+            overflow: hidden;
+        }
+        .level-progress-fill {
+            height: 100%;
+            border-radius: 3px;
+            width: 0%;                    /* starts at 0 */
+            transition: width 1s cubic-bezier(.4,0,.2,1);
+        }
+
+        .level-count { font-size:0.8rem; font-weight:600; min-width:28px; text-align:right; }
+
+        /* level colors */
+        .color-a{background:#22c55e;color:#052e16} .fill-a{background:#22c55e}
+        .color-b{background:#84cc16;color:#1a2e05} .fill-b{background:#84cc16}
+        .color-c{background:#eab308;color:#422006} .fill-c{background:#eab308}
+        .color-d{background:#f97316;color:#431407} .fill-d{background:#f97316}
+        .color-e{background:#ef4444;color:#450a0a} .fill-e{background:#ef4444}
+        .color-f{background:#7c3aed;color:#f5f3ff} .fill-f{background:#7c3aed}
+
+        /* ── Cell list ───────────────────────────────────────────────────── */
+        .cell-item {
+            padding: 9px 10px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            margin-bottom: 5px;
+            border-left: 3px solid;
+            cursor: pointer;
+            font-size: 0.78rem;
+            opacity: 0;
+            transform: translateX(-8px);
+            transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
+            animation: none;
+        }
+        .cell-item.visible {
+            opacity: 1;
+            transform: translateX(0);
+            transition: opacity 0.35s ease, transform 0.35s ease,
+                        background 0.2s, box-shadow 0.2s;
+        }
+        .cell-item:hover {
+            background: rgba(255,255,255,0.07);
+            transform: translateX(4px) !important;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+        }
+        .cell-item .stats {
+            display:flex; gap:10px;
+            font-size:0.7rem; color:var(--text-muted); margin-top:2px;
+        }
+        .cell-item .stats span { font-weight:600; }
+
+        /* ── Pipeline box ────────────────────────────────────────────────── */
+        .pipeline-box {
+            background: var(--accent-dim);
+            border: 1px solid rgba(99,102,241,0.2);
+            border-radius: 10px;
+            padding: 14px;
+        }
+        .pipe-step {
+            display:flex; align-items:center; gap:8px;
+            padding:4px 0; font-size:0.75rem;
+        }
+        .pipe-arrow { color:var(--accent); font-size:0.65rem; padding-left:12px; }
+
+        .note-box {
+            background: rgba(234,179,8,0.08);
+            border: 1px solid rgba(234,179,8,0.25);
+            border-radius: 10px;
+            padding: 12px;
+            margin-top: 14px;
+            font-size: 0.72rem;
+            color: #eab308;
+            line-height: 1.5;
+        }
+
+        /* ── MapLibre UI overrides ───────────────────────────────────────── */
+        .maplibregl-popup-content {
+            background: #1a1f4e;
+            color: #e0e0e0;
+            border-radius: 12px;
+            border: 1px solid rgba(99,102,241,0.35);
+            padding: 0;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            font-family: 'Inter', sans-serif;
+            min-width: 220px;
+            animation: pop-in 0.2s ease;
+        }
+        @keyframes pop-in {
+            from { transform:scale(0.9); opacity:0; }
+            to   { transform:scale(1);   opacity:1; }
+        }
+        .maplibregl-popup-tip { border-top-color: #1a1f4e !important; }
+        .maplibregl-popup-close-button {
+            color:#94a3b8; font-size:18px;
+            padding:6px 10px; top:4px; right:4px;
+            background:none; border:none; cursor:pointer;
+        }
+        .maplibregl-popup-close-button:hover {
+            color:#e0e0e0; background:rgba(255,255,255,0.08); border-radius:6px;
+        }
+        .maplibregl-ctrl-attrib { background:rgba(10,14,39,0.8) !important; color:#64748b !important; }
+        .maplibregl-ctrl-attrib a { color:#6366f1 !important; }
+        .maplibregl-ctrl-group {
+            background:rgba(17,22,51,0.92) !important;
+            border:1px solid rgba(99,102,241,0.25) !important;
+            border-radius:8px !important;
+        }
+        .maplibregl-ctrl-group button { color:#94a3b8 !important; }
+        .maplibregl-ctrl-group button:hover { background:rgba(99,102,241,0.15) !important; }
+
+        /* ── Popup inner styles ──────────────────────────────────────────── */
+        .popup-inner { padding:12px 14px; }
+        .popup-title { font-weight:600; margin-bottom:8px; font-size:0.88rem; color:#818cf8; }
+        .popup-grid  { display:grid; grid-template-columns:auto 1fr; gap:3px 14px; }
+        .popup-label { color:#94a3b8; font-size:0.73rem; padding:1px 0; }
+        .popup-value { font-weight:600; font-size:0.82rem; padding:1px 0; }
+        .popup-sep   { grid-column:1/-1; height:1px; background:rgba(255,255,255,0.1); margin:5px 0; }
+
+        /* ── Util ────────────────────────────────────────────────────────── */
+        @keyframes fade-up {
+            from { opacity:0; transform:translateY(10px); }
+            to   { opacity:1; transform:translateY(0); }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Loading overlay -->
+    <div id="loader">
+        <div class="loader-logo">🚗 Urban Mobility Engine</div>
+        <div class="loader-bar-wrap"><div class="loader-bar"></div></div>
+        <div class="loader-status" id="loaderStatus">Loading engine data…</div>
+    </div>
+
+    <header class="header">
+        <h1>Urban Mobility Engine — Madrid</h1>
+        <div class="header-badges">
+            <div class="badge badge-live" id="liveStatus"><div class="pulse-dot"></div>Waiting for data…</div>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div id="map"></div>
+        <aside class="sidebar">
+            <div class="section">
+                <h3>Engine pipeline</h3>
+                <div class="kpi-grid" id="kpis"></div>
+            </div>
+            <div class="section">
+                <h3>Congestion distribution</h3>
+                <div id="levelBars"></div>
+            </div>
+            <div class="section">
+                <h3>S2 cells with metrics</h3>
+                <div id="cellList"></div>
+            </div>
+            <div class="section">
+                <h3>Technical pipeline</h3>
+                <div class="pipeline-box">
+                    <div class="pipe-step">Historical CSV → TrafficRecord</div>
+                    <div class="pipe-arrow">↓</div>
+                    <div class="pipe-step">Locations → GpsPoint (lat/lng)</div>
+                    <div class="pipe-arrow">↓</div>
+                    <div class="pipe-step">S2 Geometry → ~318m cells</div>
+                    <div class="pipe-arrow">↓</div>
+                    <div class="pipe-step">SRF = v_obs / v_ref (delay_factor)</div>
+                    <div class="pipe-arrow">↓</div>
+                    <div class="pipe-step">Percentiles + IQR anomalies</div>
+                    <div class="pipe-arrow">↓</div>
+                    <div class="pipe-step">JSON → MapLibre GL map (this view)</div>
+                </div>
+                <div class="note-box">
+                    <strong>Historical data (December 2025)</strong><br>
+                    This demo uses historical CSVs. The <code>live</code> mode connects to the
+                    Madrid City Council real-time API (every 5 min).
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script>
+        // ── Constants ──────────────────────────────────────────────────────
+        const COLORS = {
+            A:'#22c55e', B:'#84cc16', C:'#eab308',
+            D:'#f97316', E:'#ef4444', F:'#7c3aed'
+        };
+        const LEVEL_INFO = {
+            A: { label:'Free flow',             desc:'SRF ≥ 0.90' },
+            B: { label:'Stable flow',           desc:'SRF 0.80–0.90' },
+            C: { label:'Moderate restrictions', desc:'SRF 0.65–0.80' },
+            D: { label:'Unstable flow',         desc:'SRF 0.50–0.65' },
+            E: { label:'Severe congestion',     desc:'SRF 0.35–0.50' },
+            F: { label:'Collapse',              desc:'SRF < 0.35' }
+        };
+
+        // ── Loader helpers ─────────────────────────────────────────────────
+        function setLoaderStatus(msg) {
+            document.getElementById('loaderStatus').textContent = msg;
+        }
+        function hideLoader() {
+            document.getElementById('loader').classList.add('hidden');
+        }
+
+        // ── Count-up animation ─────────────────────────────────────────────
+        function countUp(el, target, duration = 900, suffix = '') {
+            const start = performance.now();
+            const num = parseInt(target, 10);
+            function step(now) {
+                const p = Math.min((now - start) / duration, 1);
+                const ease = 1 - Math.pow(1 - p, 3);  // cubic ease-out
+                el.textContent = Math.round(num * ease).toLocaleString() + suffix;
+                if (p < 1) requestAnimationFrame(step);
+            }
+            requestAnimationFrame(step);
+        }
+
+        // ── MapLibre setup ─────────────────────────────────────────────────
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+            center: [-3.70, 40.42],
+            zoom: 12,
+            antialias: true
+        });
+        map.addControl(new maplibregl.NavigationControl(), 'top-right');
+        map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
+
+        // ── Build GeoJSON — only cells with metrics ──────────────────────
+        function buildGeoJSON(cells) {
+            return {
+                type: 'FeatureCollection',
+                features: cells.filter(c => !!c.metrics).map((c, i) => {
+                    // vertices = [[lat,lng], ...] (Rust/Leaflet order) → [lng,lat] for GeoJSON
+                    const coords = c.vertices.map(v => [v[1], v[0]]);
+                    const first = coords[0];
+                    const last  = coords[coords.length - 1];
+                    if (first && (first[0] !== last[0] || first[1] !== last[1])) coords.push([...first]);
+
+                    const hasS  = !!c.stats;
+                    const level = c.metrics.congestion_level;
+
+                    return {
+                        type: 'Feature',
+                        id: i,
+                        geometry: { type:'Polygon', coordinates:[coords] },
+                        properties: {
+                            idx: i, cell_id: c.cell_id,
+                            lat: c.lat, lng: c.lng, point_count: c.point_count,
+                            has_metrics: true,
+                            level,
+                            fill_color:   COLORS[level],
+                            line_color:   COLORS[level],
+                            fill_opacity: 0.42,
+                            line_opacity: 0.85,
+                            line_width:   1.6,
+                            avg_srf: c.metrics.avg_delay_factor,
+                            min_srf: c.metrics.min_delay_factor,
+                            max_srf: c.metrics.max_delay_factor,
+                            std_srf: c.metrics.std_delay_factor,
+                            obs:     c.metrics.observation_count,
+                            road:    c.metrics.road_type,
+                            has_stats: hasS,
+                            median: hasS ? c.stats.median          : null,
+                            p25:    hasS ? c.stats.percentile_25   : null,
+                            p75:    hasS ? c.stats.percentile_75   : null,
+                            p95:    hasS ? c.stats.percentile_95   : null,
+                            iqr:    hasS ? c.stats.iqr             : null,
+                            anom:   hasS ? c.stats.anomaly_count   : null,
+                        }
+                    };
+                })
+            };
+        }
+
+        // ── Popup HTML ─────────────────────────────────────────────────────
+        function buildPopupHTML(p) {
+            const color = p.has_metrics ? (COLORS[p.level] || '#818cf8') : '#64748b';
+            const f = n => Number(n).toFixed(3);
+            let h = `<div class="popup-inner">`;
+            h += `<div class="popup-title">S2 cell ${String(p.cell_id).substring(0,8)}…</div>`;
+            h += `<div class="popup-grid">`;
+            h += `<div class="popup-label">GPS points</div><div class="popup-value">${p.point_count}</div>`;
+            h += `<div class="popup-label">Centroid</div><div class="popup-value">${Number(p.lat).toFixed(4)}, ${Number(p.lng).toFixed(4)}</div>`;
+            if (p.has_metrics) {
+                h += `<div class="popup-sep"></div>`;
+                h += `<div class="popup-label">Mean SRF</div><div class="popup-value" style="color:${color}">${f(p.avg_srf)}</div>`;
+                h += `<div class="popup-label">Level</div><div class="popup-value" style="color:${color}">${p.level} — ${LEVEL_INFO[p.level]?.label||''}</div>`;
+                h += `<div class="popup-label">SRF range</div><div class="popup-value">${f(p.min_srf)} – ${f(p.max_srf)}</div>`;
+                h += `<div class="popup-label">σ SRF</div><div class="popup-value">${f(p.std_srf)}</div>`;
+                h += `<div class="popup-label">Road type</div><div class="popup-value">${p.road}</div>`;
+                h += `<div class="popup-label">Observations</div><div class="popup-value">${p.obs}</div>`;
+            }
+            if (p.has_stats) {
+                h += `<div class="popup-sep"></div>`;
+                h += `<div class="popup-label">Median</div><div class="popup-value">${f(p.median)}</div>`;
+                h += `<div class="popup-label">P25 / P75</div><div class="popup-value">${f(p.p25)} / ${f(p.p75)}</div>`;
+                h += `<div class="popup-label">P95</div><div class="popup-value">${f(p.p95)}</div>`;
+                h += `<div class="popup-label">IQR</div><div class="popup-value">${f(p.iqr)}</div>`;
+                if (p.anom > 0) h += `<div class="popup-label">⚠️ Anomalies</div><div class="popup-value" style="color:#ef4444">${p.anom}</div>`;
+            }
+            if (!p.has_metrics) {
+                h += `<div class="popup-sep"></div><div class="popup-label" style="grid-column:1/-1;color:#94a3b8">Insufficient data for metrics.</div>`;
+            }
+            h += `</div></div>`;
+            return h;
+        }
+
+        // ── Render sidebar ─────────────────────────────────────────────────
+        function renderSidebar(data) {
+            const { pipeline, cells } = data;
+
+            // KPIs with count-up
+            const kpiDefs = [
+                { val: pipeline.total_gps_points, label:'GPS points',      color:'#818cf8' },
+                { val: pipeline.s2_cell_count,    label:'S2 cells',        color:'#a78bfa' },
+                { val: pipeline.cells_with_metrics,label:'With metrics',    color:'#22c55e' },
+                { val: pipeline.cells_with_stats,  label:'With statistics',color:'#eab308' },
+            ];
+            document.getElementById('kpis').innerHTML = kpiDefs.map(k =>
+                `<div class="kpi-card">
+                    <div class="kpi-value" style="color:${k.color}" data-target="${k.val}">0</div>
+                    <div class="kpi-label">${k.label}</div>
+                </div>`
+            ).join('');
+
+            // Animate counters after a short delay
+            setTimeout(() => {
+                document.querySelectorAll('.kpi-value[data-target]').forEach((el, i) => {
+                    setTimeout(() => countUp(el, el.dataset.target, 900), i * 80);
+                });
+            }, 300);
+
+            // Level bars — rendered at 0 width, then animated
+            const levels = { A:0, B:0, C:0, D:0, E:0, F:0 };
+            cells.forEach(c => {
+                if (c.metrics) {
+                    const lev = c.metrics.congestion_level;
+                    if (lev in levels) levels[lev]++;
+                }
+            });
+            const maxCount = Math.max(...Object.values(levels), 1);
+
+            let barsHtml = '';
+            Object.entries(levels).forEach(([lev, count]) => {
+                const pct = (count / maxCount * 100).toFixed(0);
+                barsHtml += `
+                <div class="level-bar">
+                    <div class="level-badge color-${lev.toLowerCase()}">${lev}</div>
+                    <div class="level-info">
+                        <div class="level-name">${LEVEL_INFO[lev].label}</div>
+                        <div class="level-desc">${LEVEL_INFO[lev].desc}</div>
+                        <div class="level-progress">
+                            <div class="level-progress-fill fill-${lev.toLowerCase()}"
+                                 data-pct="${pct}" style="width:0%"></div>
+                        </div>
+                    </div>
+                    <div class="level-count">${count}</div>
+                </div>`;
+            });
+            document.getElementById('levelBars').innerHTML = barsHtml;
+
+            // Animate progress bars
+            setTimeout(() => {
+                document.querySelectorAll('.level-progress-fill[data-pct]').forEach(el => {
+                    el.style.width = el.dataset.pct + '%';
+                });
+            }, 400);
+
+            // Cell list with staggered fade-in
+            const metricCells = cells.filter(c => c.metrics);
+            let cellHtml = '';
+            metricCells.forEach((c, i) => {
+                const m     = c.metrics;
+                const color = COLORS[m.congestion_level] || '#6366f1';
+                let statsLine = '';
+                if (c.stats) {
+                    statsLine = `P25=${c.stats.percentile_25.toFixed(2)} | P75=${c.stats.percentile_75.toFixed(2)} | IQR=${c.stats.iqr.toFixed(3)}`;
+                    if (c.stats.anomaly_count > 0) statsLine += ` | ⚠️${c.stats.anomaly_count} anomalies`;
+                }
+                cellHtml += `
+                <div class="cell-item" style="border-color:${color}" data-delay="${i}"
+                     onclick="map.flyTo({ center:[${c.lng},${c.lat}], zoom:16, speed:1.4, curve:1.2 })">
+                    <strong style="color:${color}">Cell ${i+1} — Level ${m.congestion_level}</strong> (${m.road_type})
+                    <div class="stats">
+                        SRF: <span style="color:${color}">${m.avg_delay_factor.toFixed(3)}</span>
+                        &nbsp;|&nbsp; ${m.observation_count} obs
+                        &nbsp;|&nbsp; σ=${m.std_delay_factor.toFixed(3)}
+                    </div>
+                    ${statsLine ? `<div class="stats">${statsLine}</div>` : ''}
+                </div>`;
+            });
+            document.getElementById('cellList').innerHTML = cellHtml ||
+                '<div style="color:#64748b;font-size:0.8rem">No cells with enough observations</div>';
+
+            // Stagger reveal
+            setTimeout(() => {
+                document.querySelectorAll('.cell-item[data-delay]').forEach(el => {
+                    const delay = Math.min(parseInt(el.dataset.delay, 10) * 40, 1200);
+                    setTimeout(() => el.classList.add('visible'), delay);
+                });
+            }, 500);
+        }
+
+        // ── Add layers to MapLibre ─────────────────────────────────────────
+        function addS2Layers(geojson, cells) {
+            map.addSource('s2-cells', { type:'geojson', data:geojson });
+
+            map.addLayer({
+                id: 's2-fill',
+                type: 'fill',
+                source: 's2-cells',
+                paint: {
+                    'fill-color':   ['get','fill_color'],
+                    'fill-opacity': ['get','fill_opacity']
+                }
+            });
+
+            map.addLayer({
+                id: 's2-line',
+                type: 'line',
+                source: 's2-cells',
+                paint: {
+                    'line-color':   ['get','line_color'],
+                    'line-width':   ['get','line_width'],
+                    'line-opacity': ['get','line_opacity']
+                }
+            });
+
+            // Hover highlight overlay
+            map.addLayer({
+                id: 's2-hover',
+                type: 'fill',
+                source: 's2-cells',
+                paint: {
+                    'fill-color':   '#ffffff',
+                    'fill-opacity': ['case',['boolean',['feature-state','hover'],false],0.13,0]
+                }
+            });
+
+            // Popup
+            const popup = new maplibregl.Popup({ closeButton:true, closeOnClick:false, maxWidth:'300px' });
+            map.on('click','s2-fill', e => {
+                popup.setLngLat(e.lngLat).setHTML(buildPopupHTML(e.features[0].properties)).addTo(map);
+            });
+
+            // Hover
+            let hovId = null;
+            map.on('mousemove','s2-fill', e => {
+                map.getCanvas().style.cursor = 'pointer';
+                if (e.features.length) {
+                    if (hovId !== null) map.setFeatureState({source:'s2-cells',id:hovId},{hover:false});
+                    hovId = e.features[0].id;
+                    map.setFeatureState({source:'s2-cells',id:hovId},{hover:true});
+                }
+            });
+            map.on('mouseleave','s2-fill', () => {
+                map.getCanvas().style.cursor = '';
+                if (hovId !== null) map.setFeatureState({source:'s2-cells',id:hovId},{hover:false});
+                hovId = null;
+            });
+
+            // Fit bounds
+            if (cells.length) {
+                const lngs = cells.map(c => c.lng);
+                const lats = cells.map(c => c.lat);
+                map.fitBounds([
+                    [Math.min(...lngs)-0.02, Math.min(...lats)-0.02],
+                    [Math.max(...lngs)+0.02, Math.max(...lats)+0.02]
+                ], { padding:24, duration:1400 });
+            }
+        }
+
+        // ── Live refresh state ─────────────────────────────────────────────
+        let lastTimestamp = null;   // source_timestamp of the last processed JSON
+        let mapReady      = false;  // true once MapLibre has finished loading
+        const POLL_MS     = 30_000; // check for new data every 30 s
+
+        function updateLiveBadge(ts) {
+            const el = document.getElementById('liveStatus');
+            if (!el) return;
+            const hora = ts ? new Date(ts).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit', second:'2-digit' }) : '—';
+            el.innerHTML = `<div class="pulse-dot"></div>Live · ${hora}`;
+        }
+
+        // Update the GeoJSON source without recreating the layers (no flicker)
+        function updateMapSource(geojson) {
+            const src = map.getSource('s2-cells');
+            if (src) {
+                src.setData(geojson);   // incremental update, no flash
+            }
+        }
+
+        // ── Main fetch ────────────────────────────────────────────────────────
+        async function loadData(isRefresh = false) {
+            if (!isRefresh) setLoaderStatus('Connecting to the Madrid API…');
+            try {
+                const res = await fetch('live_output.json?t=' + Date.now());
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                const data = await res.json();
+
+                // Detect whether there is really new data by comparing the timestamp
+                const ts = data.generated_at || data.pipeline?.source || null;
+                if (isRefresh && ts === lastTimestamp) {
+                    return; // no changes, the engine has not produced a new tick yet
+                }
+                lastTimestamp = ts;
+
+                renderSidebar(data);
+                updateLiveBadge(ts);
+
+                const geojson = buildGeoJSON(data.cells);
+
+                if (isRefresh && mapReady) {
+                    // Silent refresh: only update the GeoJSON source
+                    updateMapSource(geojson);
+                } else {
+                    // First load: add layers
+                    const doAdd = () => {
+                        addS2Layers(geojson, data.cells);
+                        mapReady = true;
+                        setTimeout(hideLoader, 600);
+                    };
+                    if (map.loaded()) doAdd();
+                    else map.on('load', doAdd);
+                }
+
+            } catch (err) {
+                if (!isRefresh) {
+                    setLoaderStatus('Error: ' + err.message + ' — Run: ./target/release/tfg live --ticks 1');
+                }
+                console.warn('[dashboard] fetch error:', err.message);
+            }
+        }
+
+        // Initial load + polling every 30 s
+        loadData(false);
+        setInterval(() => loadData(true), POLL_MS);
+    </script>
+</body>
+
+</html>
